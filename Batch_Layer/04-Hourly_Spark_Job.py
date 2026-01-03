@@ -13,7 +13,7 @@ from py4j.protocol import Py4JJavaError
 
 PROJECT_RAW_PATH = "/project/raw_data"
 HIVE_DB = "retail_dw"
-DATE_DIM_BOOTSTRAP_PATH = "file:///data/RetailDataHub-Bigdata-/batch_layer/dimensions/date_dim.csv"
+DATE_DIM_BOOTSTRAP_PATH = "file:///data/RetailDataHub-Bigdata/batch_layer/dimensions/date_dim.csv"
 
 
 def create_spark():
