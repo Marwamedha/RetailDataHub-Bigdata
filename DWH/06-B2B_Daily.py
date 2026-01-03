@@ -13,7 +13,7 @@ spark = SparkSession\
 
 sc = spark.sparkContext
 
-_ = spark.sql("USE Qcompany")
+_ = spark.sql("USE companyabc")
 
 previous_day_date = datetime.now() - timedelta(days=1)
 previous_day_date = str(previous_day_date.strftime('%Y-%m-%d'))
