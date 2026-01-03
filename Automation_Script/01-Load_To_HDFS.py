@@ -70,7 +70,7 @@ def load_to_hdfs(
 if __name__ == "__main__":
 
     # PROJECT ROOT
-    PROJECT_ROOT = "/data/RetailDataHub-Bigdata-"
+    PROJECT_ROOT = "/data/RetailDataHub-Bigdata"
 
     # Local landing zone (from Step 0)
     LOCAL_LANDING_PATH = os.path.join(PROJECT_ROOT, "data", "landing")
