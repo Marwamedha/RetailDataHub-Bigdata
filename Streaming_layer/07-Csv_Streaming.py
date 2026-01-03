@@ -1,20 +1,21 @@
+import os
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, to_timestamp, lit
+from pyspark.sql.functions import from_json, col, to_timestamp, lit, current_date, date_format
 from pyspark.sql.types import StructType, StringType, IntegerType, FloatType, StructField
 
-# Initialize Spark session
+# === Spark Session ===
 spark = SparkSession.builder \
-    .appName("KafkaStreamingExample") \
+    .appName("RetailDataHub_Kafka_Streaming") \
     .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.8") \
     .getOrCreate()
 
-# Kafka connection details
-bootstrap_servers = "pkc-56d1g.eastus.azure.confluent.cloud:9092"
-kafka_topic = "Diaa_topic"
-kafka_username = "JUKQQM4ZM632RECA"
-kafka_password = "UUkrPuSttgOC0U9lY3ZansNsKfN9fbxZPFwrGxudDrfv+knTD4rCwK+KdIzVPX0D"
+# === Kafka Configuration (use environment variables for security) ===
+bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "pkc-56d1g.eastus.azure.confluent.cloud:9092")
+kafka_topic = os.getenv("KAFKA_TOPIC", "Diaa_topic")
+kafka_username = os.getenv("KAFKA_USERNAME")
+kafka_password = os.getenv("KAFKA_PASSWORD")
 
-# Define schema for the incoming JSON data
+# === Define schema for incoming JSON ===
 schema = StructType([
     StructField("eventType", StringType(), True),
     StructField("customerId", StringType(), True),
@@ -31,37 +32,43 @@ schema = StructType([
     StructField("algorithm", StringType(), True)
 ])
 
-# Read data from Kafka topic as a streaming DataFrame
-df = spark \
-    .readStream \
+# === Read streaming data from Kafka ===
+df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", bootstrap_servers) \
     .option("subscribe", kafka_topic) \
     .option("startingOffsets", "earliest") \
     .option("kafka.security.protocol", "SASL_SSL") \
     .option("kafka.sasl.mechanism", "PLAIN") \
-    .option("kafka.sasl.jaas.config",
-            f'org.apache.kafka.common.security.plain.PlainLoginModule required username="{kafka_username}" password="{kafka_password}";') \
+    .option(
+        "kafka.sasl.jaas.config",
+        f'org.apache.kafka.common.security.plain.PlainLoginModule required username="{kafka_username}" password="{kafka_password}";'
+    ) \
     .load()
 
-# Parse the JSON data and apply schema
-json_df = df.selectExpr("CAST(value AS STRING)").select(from_json("value", schema).alias("data")).select("data.*")
+# === Parse JSON and flatten schema ===
+json_df = df.selectExpr("CAST(value AS STRING)") \
+    .select(from_json("value", schema).alias("data")) \
+    .select("data.*")
 
-# Handle potentially missing or empty metadata fields
+# === Transform data ===
 transformed_df = json_df \
     .withColumn("timestamp", to_timestamp(col("timestamp"), "yyyy-MM-dd'T'HH:mm:ss")) \
     .withColumn("metadata_category", col("metadata.category").cast(StringType())) \
     .withColumn("metadata_source", col("metadata.source").cast(StringType())) \
-    .drop("metadata")
+    .drop("metadata") \
+    .filter((col("quantity") >= 0) & (col("totalAmount") >= 0)) \
+    .withColumn("event_date", date_format(col("timestamp"), "yyyy-MM-dd")) \
+    .withColumn("event_hour", date_format(col("timestamp"), "HH"))
 
-# Write the transformed data to CSV files
-query = transformed_df \
-    .writeStream \
+# === Write streaming data to HDFS Delta (partitioned by date/hour) ===
+query = transformed_df.writeStream \
+    .format("delta") \
     .outputMode("append") \
-    .format("csv") \
-    .option("path", "/project/log_Events") \
-    .option("checkpointLocation", "/project/streaming_checkpoint/") \
+    .option("path", "/project/log_Events_delta") \
+    .option("checkpointLocation", "/project/streaming_checkpoint_delta/") \
+    .partitionBy("event_date", "event_hour") \
     .start()
 
-query.awaitTermination(20)
-spark.stop()
+# === Continuous streaming (production-ready) ===
+query.awaitTermination()
