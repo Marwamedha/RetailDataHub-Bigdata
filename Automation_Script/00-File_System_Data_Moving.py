@@ -2,32 +2,48 @@ import os
 import shutil
 import time
 
-def move_one_subfolder_per_hour(source_folder, target_folder):
-    """Moves one subfolder per hour from source to target."""
 
-    subfolders = [f for f in os.listdir(source_folder) if os.path.isdir(os.path.join(source_folder, f))]
+def move_one_subfolder_per_hour(source_folder, target_folder, delay_seconds=3600):
+    """
+    Moves one subfolder at a time from source to target
+    with a fixed delay (default = 1 hour).
+    """
+
+    subfolders = [
+        f for f in os.listdir(source_folder)
+        if os.path.isdir(os.path.join(source_folder, f))
+    ]
+
     num_subfolders = len(subfolders)
 
     for i, subfolder in enumerate(subfolders):
-        subfolder_path = os.path.join(source_folder, subfolder)
-        target_subfolder_path = os.path.join(target_folder, subfolder)
+        src_path = os.path.join(source_folder, subfolder)
+        tgt_path = os.path.join(target_folder, subfolder)
 
         try:
-            shutil.move(subfolder_path, target_subfolder_path)
-            print(f"Moved '{subfolder}' from '{source_folder}' to '{target_folder}'")
+            shutil.move(src_path, tgt_path)
+            print(f"[INFO] Moved '{subfolder}' to landing zone")
         except Exception as e:
-            print(f"Error moving '{subfolder}': {e}")
+            print(f"[ERROR] Failed to move '{subfolder}': {e}")
 
-        # Calculate remaining time until the next hour
-        if i < num_subfolders - 1:  # Avoid unnecessary sleep after the last subfolder
-            current_time = time.localtime()
-            seconds_to_next_hour = 3600 
-            print(f"Waiting {seconds_to_next_hour} seconds until the next hour...")
-            time.sleep(seconds_to_next_hour)  # Wait until the next hour
+        # Wait before moving next batch
+        if i < num_subfolders - 1:
+            print(f"[INFO] Waiting {delay_seconds} seconds before next batch...")
+            time.sleep(delay_seconds)
+
 
 if __name__ == "__main__":
-    source_folder = r"D:\ITI\24-Spark\Project\Spark Project\data"
-    target_folder = r"D:\ITI\15-Hadoop\spark-sql-and-pyspark-using-python3\data\project"
 
-    move_one_subfolder_per_hour(source_folder, target_folder)
-    print("All subfolders moved successfully!")
+    #  PROJECT PATHS
+    PROJECT_ROOT = r"D:\Retail-Big-Data-Project"
+
+    SOURCE_FOLDER = os.path.join(PROJECT_ROOT, "data", "source")
+    TARGET_FOLDER = os.path.join(PROJECT_ROOT, "data", "landing")
+
+    move_one_subfolder_per_hour(
+        source_folder=SOURCE_FOLDER,
+        target_folder=TARGET_FOLDER,
+        delay_seconds=3600  # 1 hour simulation
+    )
+
+    print("[SUCCESS] All subfolders processed successfully!")
